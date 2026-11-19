@@ -75,6 +75,10 @@ export async function buyCreditPack(form: FormData) {
 export async function openPortal() {
   if (!stripeEnabled()) redirect("/settings/billing?error=stripe");
   const { customerId } = await customerFor();
-  const session = await stripe().billingPortal.sessions.create({ customer: customerId, return_url: `${siteUrl()}/settings/billing` });
+  const session = await stripe().billingPortal.sessions.create({
+    customer: customerId,
+    return_url: `${siteUrl()}/settings/billing`,
+    ...(process.env.STRIPE_PORTAL_CONFIGURATION ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION } : {}),
+  });
   redirect(session.url);
 }
