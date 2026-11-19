@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreatorOS
 
-## Getting Started
+L'espace de travail IA des créateurs de contenu : idées, titres, hooks, scripts, descriptions, tags, posts de promo et branding générés par Claude, puis pipeline Kanban, téléprompteur, calendrier et suivi des publications.
 
-First, run the development server:
+**Stack** : Next.js 16 (App Router) · Supabase (Postgres, Auth, RLS) · Stripe · Anthropic (Claude Haiku 5.5 + Sonnet 5.5) · Tailwind CSS 4 · dnd-kit.
+
+## Fonctionnalités (MVP)
+
+| Module | Gratuit | Crédits IA |
+|---|---|---|
+| Onboarding + profil créateur (niche, univers, plateformes, style) | ✓ | |
+| Thèmes : 11 couleurs d'accent + couleur libre, mode sombre / clair | ✓ | |
+| Projets (brief, titre, hook, script, description, tags, checklist, dates, notes) | ✓ | |
+| Pipeline Kanban drag and drop, étapes personnalisables | ✓ | |
+| Calendrier éditorial + suivi des publications (vues, j'aime, commentaires) | ✓ | |
+| Téléprompteur (vitesse, taille, miroir, plein écran, raccourcis clavier) | ✓ | |
+| Partage Discord par webhook | ✓ | |
+| Idées, titres, hooks, description SEO, tags, posts de promo | | 1 |
+| Script complet, branding de chaîne | | 3 |
+| Kit vidéo complet | | 4 |
+
+## Démarrer en local
+
+Prérequis : Node 20+, Docker (pour Supabase en local).
 
 ```bash
+npm install
+npx supabase start            # lance Postgres + Auth en local et applique supabase/migrations
+cp .env.example .env.local    # puis colle les clés affichées par `npx supabase status`
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sans `ANTHROPIC_API_KEY` (ou avec `AI_DEMO_MODE=true`), l'IA renvoie des exemples et ne débite aucun crédit : pratique pour tester l'interface.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Mise en production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Supabase** : crée un projet (région UE), puis `npx supabase link --project-ref <ref>` et `npx supabase db push` pour appliquer le schéma.
+   Dans Authentication → URL Configuration : Site URL = ton domaine, Redirect URLs = `https://ton-domaine/auth/callback`.
+   Pour Google : Authentication → Providers → Google (client OAuth Google Cloud).
+2. **Stripe** : crée 2 produits d'abonnement (Créateur, Pro) avec un prix mensuel et annuel chacun, et 2 produits ponctuels (100 et 500 crédits). Reporte les `price_...` dans les variables `STRIPE_PRICE_*`.
+   Webhook : `https://ton-domaine/api/stripe/webhook` avec les événements `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`.
+   Active le portail client (Settings → Billing → Customer portal) pour permettre de changer de plan et d'annuler.
+3. **Anthropic** : crée une clé sur console.anthropic.com, mets `ANTHROPIC_API_KEY` et `AI_DEMO_MODE=false`.
+4. **Vercel** : importe le dépôt, ajoute toutes les variables de `.env.example`, déploie.
+5. Complète les pages légales (`src/app/(marketing)/mentions-legales`, `cgv`, `confidentialite`).
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/
+    (marketing)/     landing, tarifs, pages légales
+    (auth)/          connexion, inscription, mot de passe
+    (app)/           espace connecté : dashboard, studio, pipeline, projects, calendar, teleprompter, settings
+    onboarding/      parcours de bienvenue
+    actions/         server actions (projets, étapes, IA, profil, publications, facturation)
+    api/stripe/webhook
+  lib/
+    ai/              kinds.ts (coûts + schémas), prompts.ts, run.ts (débit atomique, appel Claude, remboursement), demo.ts
+    supabase/        clients navigateur / serveur / service role
+    plans.ts, theme.ts, stripe.ts, platforms.ts, types.ts
+  proxy.ts           rafraîchit la session et protège les routes
+supabase/migrations  schéma, RLS, fonctions de crédits
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Sécurité : RLS sur toutes les tables ; un trigger empêche un utilisateur de modifier son plan ou ses crédits ; le débit des crédits est atomique (`consume_credits`) et remboursé si l'IA échoue ; le webhook Stripe est vérifié et idempotent.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Voir aussi [docs/ROADMAP.md](docs/ROADMAP.md) et [docs/PRICING.md](docs/PRICING.md).
